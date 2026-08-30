@@ -1,0 +1,2275 @@
+# MASTER CODEX PROMPT — AI DAG CODE AGENT PLATFORM
+
+You are a senior software architect and implementation engineer.
+
+Build this project completely from scratch as a production-quality prototype that can later be deployed to Hugging Face Spaces.
+
+Do not give me only explanations or pseudocode. Implement the complete working project with source code, configuration, Docker setup, tests, documentation, and a clean frontend.
+
+The system is an AI-powered coding agent that takes a user's natural-language prompt, creates a DAG execution plan using an LLM, generates code and tests through separate LLM agents, runs the code inside an isolated Docker container, performs static analysis, retries failed code, and finally returns the validated result to the user.
+
+---
+
+# 1. CORE PRODUCT
+
+The application should work like a Claude-style coding interface.
+
+User opens the website.
+
+User enters their own LLM API key.
+
+User enters a natural-language coding prompt.
+
+User can optionally select a model/provider.
+
+The system automatically determines the provider when possible.
+
+Then:
+
+1. LLM Planner creates a DAG.
+2. DAG engine executes the DAG.
+3. Agent-1 generates code.
+4. Agent-2 generates tests.
+5. Static analysis runs.
+6. Docker execution runs.
+7. Tests are executed.
+8. If everything passes, return the final code/result.
+9. If tests fail, send failure information back to the code-generation agent.
+10. Generate repaired code.
+11. Generate/revise tests.
+12. Run static analysis again.
+13. Run inside Docker again.
+14. Repeat up to 4 repair retries.
+15. If still failing after the retry limit, return the best result plus failure information.
+
+The system must visibly stream workflow progress to the frontend.
+
+---
+
+# 2. TECHNOLOGY REQUIREMENTS
+
+## Backend / Core Engine
+
+Use modern C++ (C++20 preferred).
+
+The DAG engine MUST be implemented in C++.
+
+The execution scheduler MUST be implemented in C++.
+
+The task dependency system MUST be implemented in C++.
+
+The retry/orchestration logic MUST be implemented in C++.
+
+Create the core engine as a reusable library/module separate from HTTP/API code.
+
+Use clean object-oriented design.
+
+Use interfaces/abstract classes where appropriate.
+
+The code should be modular and testable.
+
+## Frontend
+
+Use only:
+
+* HTML
+* CSS
+* Vanilla JavaScript
+
+Do NOT use React.
+
+Do NOT use Next.js.
+
+Do NOT use Vue.
+
+The UI should be lightweight and easy to deploy.
+
+## Storage
+
+Do NOT use PostgreSQL.
+
+Use SQLite for persistent conversation/task metadata.
+
+Use filesystem storage for generated project/code artifacts where appropriate.
+
+Conversation memory should include:
+
+* anonymous user ID
+* conversation ID
+* timestamp
+* user prompt
+* generated plan
+* generated code
+* test results
+* static-analysis results
+* execution results
+* retry history
+* final response
+* task status
+
+API keys must NOT be persisted in SQLite.
+
+API keys must NOT be written to logs.
+
+API keys must NOT be included in generated task history.
+
+---
+
+# 3. NO LOGIN SYSTEM
+
+There must be NO:
+
+* email login
+* password
+* OAuth
+* signup
+* authentication page
+
+Instead, when the frontend first opens, generate a random anonymous identifier:
+
+user_id
+
+Store it in browser localStorage.
+
+Example:
+
+anonymous_user_id = UUID
+
+Every conversation belongs to this user_id.
+
+The application should therefore remember previous conversations without requiring authentication.
+
+The UI should have a conversation/history sidebar similar to Claude.
+
+Example:
+
+New Chat
+
+Previous Conversations
+
+Conversation 1
+Conversation 2
+Conversation 3
+
+Clicking an old conversation should load its messages and execution history.
+
+---
+
+# 4. LLM PROVIDER SYSTEM
+
+The application must support a provider abstraction.
+
+Create:
+
+ILLMProvider
+
+Then implement provider adapters.
+
+At minimum design the architecture so providers can include:
+
+* OpenAI-compatible APIs
+* Anthropic
+* Google/Gemini
+* custom OpenAI-compatible endpoint
+
+Do not hard-code the complete application to one provider.
+
+The user should be able to enter:
+
+API Key
+
+Model
+
+Optional Base URL
+
+The frontend should provide:
+
+API Key input
+Model input/select
+Provider selector with "Auto Detect"
+
+Example UI:
+
+Provider:
+[ Auto Detect ▼ ]
+
+API Key:
+[ ************************ ]
+
+Model:
+[ model-name ]
+
+Base URL:
+[ optional ]
+
+---
+
+# 5. AUTOMATIC API/PROVIDER DETECTION
+
+When provider is set to Auto Detect:
+
+Try to identify the provider from the API key format when possible.
+
+However, DO NOT rely only on key prefixes.
+
+Use a provider detection architecture that supports:
+
+1. known key prefix detection
+2. known endpoint detection
+3. user model name
+4. explicit provider override
+
+If provider cannot be safely determined:
+
+Show:
+
+"Provider could not be determined automatically. Please select a provider."
+
+Do not guess incorrectly.
+
+Never display the full API key back to the user.
+
+Mask the API key in the UI.
+
+Do not write API keys to logs.
+
+Do not store API keys in SQLite.
+
+Prefer sending the key only for the duration of the current request.
+
+---
+
+# 6. IMPORTANT SECURITY RULE
+
+The user is providing their own API key.
+
+The server must treat the key as a secret.
+
+Never:
+
+* print API keys
+* log API keys
+* store API keys in SQLite
+* store API keys in generated files
+* include API keys in error reports
+* include API keys in frontend console logs
+
+Create a secret-redaction utility.
+
+Before writing logs, sanitize:
+
+Authorization headers
+API keys
+Bearer tokens
+environment secrets
+
+---
+
+# 7. HIGH-LEVEL SYSTEM ARCHITECTURE
+
+Create these major components:
+
+frontend/
+
+backend/
+
+core/
+
+dag/
+
+agents/
+
+providers/
+
+executor/
+
+memory/
+
+api/
+
+tests/
+
+docker/
+
+docs/
+
+Suggested structure:
+
+project/
+│
+├── CMakeLists.txt
+├── README.md
+├── Dockerfile
+├── docker-compose.yml
+├── .gitignore
+├── .env.example
+│
+├── src/
+│   ├── main.cpp
+│   │
+│   ├── api/
+│   │   ├── server.cpp
+│   │   ├── routes.cpp
+│   │   └── websocket.cpp
+│   │
+│   ├── dag/
+│   │   ├── dag.cpp
+│   │   ├── dag.h
+│   │   ├── node.cpp
+│   │   ├── node.h
+│   │   ├── scheduler.cpp
+│   │   └── scheduler.h
+│   │
+│   ├── agents/
+│   │   ├── planner_agent.cpp
+│   │   ├── coder_agent.cpp
+│   │   ├── test_agent.cpp
+│   │   ├── repair_agent.cpp
+│   │   └── static_analysis_agent.cpp
+│   │
+│   ├── providers/
+│   │   ├── llm_provider.h
+│   │   ├── openai_provider.cpp
+│   │   ├── anthropic_provider.cpp
+│   │   ├── google_provider.cpp
+│   │   └── provider_factory.cpp
+│   │
+│   ├── executor/
+│   │   ├── docker_executor.cpp
+│   │   ├── docker_executor.h
+│   │   ├── sandbox.cpp
+│   │   └── resource_limits.cpp
+│   │
+│   ├── memory/
+│   │   ├── sqlite_store.cpp
+│   │   ├── conversation_store.cpp
+│   │   └── memory_manager.cpp
+│   │
+│   ├── workflow/
+│   │   ├── workflow_engine.cpp
+│   │   ├── retry_manager.cpp
+│   │   └── event_manager.cpp
+│   │
+│   └── utils/
+│
+├── frontend/
+│   ├── index.html
+│   ├── style.css
+│   └── app.js
+│
+├── tests/
+│   ├── dag_tests.cpp
+│   ├── scheduler_tests.cpp
+│   ├── retry_tests.cpp
+│   ├── memory_tests.cpp
+│   └── provider_tests.cpp
+│
+└── runtime/
+├── conversations/
+└── artifacts/
+
+---
+
+# 8. DAG PLANNER
+
+The first LLM call is the Planner.
+
+User prompt goes to:
+
+Planner Agent
+
+The Planner returns a structured DAG.
+
+Example:
+
+{
+"task_id": "task_123",
+"nodes": [
+{
+"id": "A",
+"name": "Generate Code",
+"type": "CODE_GENERATION",
+"depends_on": []
+},
+{
+"id": "B",
+"name": "Generate Tests",
+"type": "TEST_GENERATION",
+"depends_on": ["A"]
+},
+{
+"id": "C",
+"name": "Static Analysis",
+"type": "STATIC_ANALYSIS",
+"depends_on": ["A"]
+},
+{
+"id": "D",
+"name": "Execute",
+"type": "EXECUTION",
+"depends_on": ["B", "C"]
+}
+]
+}
+
+The planner output must be validated before execution.
+
+Reject invalid DAGs.
+
+Validate:
+
+* unique node IDs
+* dependency existence
+* no circular dependency
+* valid node type
+* all nodes reachable
+* valid JSON schema
+
+---
+
+# 9. DAG ENGINE
+
+Implement a real DAG execution engine in C++.
+
+Each node contains:
+
+id
+name
+type
+status
+dependencies
+dependents
+input
+output
+error
+execution_time
+metadata
+
+Supported states:
+
+CREATED
+READY
+RUNNING
+SUCCESS
+FAILED
+SKIPPED
+RETRYING
+
+The scheduler should determine which nodes are ready.
+
+Tasks whose dependencies are completed should be eligible for parallel execution.
+
+For example:
+
+A
+│
+├── B
+│
+└── C
+│
+└──
+D
+
+After A finishes:
+
+B and C MUST execute in parallel.
+
+D must wait until both B and C finish.
+
+Use a thread pool / worker pool.
+
+Do not create one uncontrolled thread per task.
+
+Create a bounded worker pool.
+
+---
+
+# 10. NODE EXECUTION MODEL
+
+Implement:
+
+DAG
+Node
+DependencyResolver
+Scheduler
+WorkerPool
+ExecutionContext
+
+ExecutionContext should contain:
+
+task_id
+conversation_id
+user_id
+original_prompt
+working_directory
+provider
+model
+code_files
+test_files
+static_analysis
+execution_result
+retry_count
+events
+
+---
+
+# 11. AGENT-1 — CODE GENERATION
+
+Agent-1 receives:
+
+original user prompt
+
+planner result
+
+relevant conversation memory
+
+previous failed code if retrying
+
+test failures if retrying
+
+static-analysis errors if retrying
+
+execution output if retrying
+
+Agent-1 generates code.
+
+The code response must be structured.
+
+Do not rely on fragile markdown parsing only.
+
+Prefer structured JSON.
+
+Example:
+
+{
+"files": [
+{
+"path": "main.cpp",
+"content": "..."
+}
+],
+"explanation": "...",
+"language": "cpp"
+}
+
+Support multiple files because future tasks may require:
+
+src/main.cpp
+src/utils.cpp
+include/utils.h
+tests/test.cpp
+
+---
+
+# 12. AGENT-2 — TEST GENERATION
+
+Agent-2 runs after Agent-1.
+
+Agent-2 receives:
+
+original prompt
+
+generated code
+
+planner result
+
+relevant memory
+
+Agent-2 generates tests.
+
+Example:
+
+{
+"files": [
+{
+"path": "tests/test_main.cpp",
+"content": "..."
+}
+]
+}
+
+Tests should cover:
+
+normal cases
+edge cases
+invalid input where relevant
+boundary cases
+regression cases
+
+On retry, Agent-2 must receive:
+
+previous test results
+failed test details
+current code
+
+It should create or update tests when necessary.
+
+---
+
+# 13. STATIC ANALYSIS
+
+Static analysis is represented as a DAG node.
+
+Run appropriate static analysis based on project/language.
+
+Examples:
+
+C++
+
+clang-tidy
+clang++
+compiler warnings
+
+Python
+
+ruff
+pyflakes
+
+JavaScript
+
+eslint if available
+
+Do not assume every tool exists.
+
+Create a tool-detection layer.
+
+If a tool is unavailable:
+
+return a structured warning rather than crashing the whole system.
+
+Static analysis result:
+
+{
+"status": "PASS",
+"errors": [],
+"warnings": []
+}
+
+or:
+
+{
+"status": "FAIL",
+"errors": [...]
+}
+
+---
+
+# 14. DOCKER EXECUTION
+
+All generated user code MUST execute inside an isolated Docker container.
+
+Never execute generated code directly on the backend host.
+
+Create a Docker executor abstraction.
+
+Input:
+
+generated project
+tests
+runtime configuration
+
+Output:
+
+exit_code
+stdout
+stderr
+test_status
+timeout
+duration
+
+Apply security/resource limits.
+
+At minimum support:
+
+CPU limit
+memory limit
+execution timeout
+process limit where available
+no privileged mode
+read-only base filesystem where practical
+temporary workspace
+network disabled by default
+
+Do not mount sensitive host directories.
+
+Never mount the Docker socket into the generated-code container.
+
+---
+
+# 15. EXECUTION FLOW
+
+The basic workflow should be:
+
+USER PROMPT
+
+↓
+
+PLANNER
+
+↓
+
+DAG
+
+↓
+
+A: Generate Code
+
+↓
+
+B: Generate Tests
+C: Static Analysis
+
+B and C run in parallel.
+
+↓
+
+D: Execute
+
+↓
+
+TEST RESULT
+
+If PASS:
+
+↓
+
+TASK COMPLETED
+
+Return final answer/code.
+
+If FAIL:
+
+↓
+
+RETRY STARTED
+
+↓
+
+Repair Code
+
+↓
+
+Generate/Revised Tests
+
+↓
+
+Static Analysis
+
+↓
+
+Execute
+
+↓
+
+Check result
+
+Repeat until:
+
+success
+
+OR
+
+maximum retry count reached.
+
+---
+
+# 16. RETRY SYSTEM
+
+Create:
+
+RetryManager
+
+Configuration:
+
+MAX_RETRIES = 4
+
+Initial execution is attempt 0.
+
+Repair attempts:
+
+1
+2
+3
+4
+
+Therefore maximum execution attempts:
+
+5
+
+Make this configurable in one place.
+
+On test failure provide the repair agent with:
+
+original prompt
+current code
+current tests
+failed tests
+stdout
+stderr
+exit code
+static analysis
+previous repair history
+
+The repair LLM should specifically explain:
+
+what failed
+why it failed
+what changed
+
+Then generate the repaired files.
+
+Do not blindly replace unrelated files.
+
+Preserve working files whenever possible.
+
+---
+
+# 17. RETRY EVENT EXAMPLE
+
+Backend events should be streamed to frontend.
+
+Example:
+
+{
+"event": "TEST_FAILED",
+"task_id": "task_123",
+"message": "Tests failed",
+"attempt": 1
+}
+
+Then:
+
+{
+"event": "RETRY_STARTED",
+"attempt": 2
+}
+
+Then:
+
+{
+"event": "LLM_CALLED",
+"agent": "repair_agent"
+}
+
+Then:
+
+{
+"event": "CONTAINER_STARTED"
+}
+
+Then:
+
+{
+"event": "TEST_STARTED"
+}
+
+Then:
+
+{
+"event": "TEST_PASSED"
+}
+
+Then:
+
+{
+"event": "TASK_COMPLETED"
+}
+
+---
+
+# 18. FRONTEND UI
+
+Create a clean Claude-style interface.
+
+White background.
+
+Minimal design.
+
+Professional typography.
+
+No unnecessary gradients.
+
+No excessive colors.
+
+Main layout:
+
+LEFT SIDEBAR
++
+MAIN CHAT AREA
+
+Sidebar:
+
+New Chat
+
+Conversation history
+
+Settings
+
+Main area:
+
+Top header
+
+Conversation messages
+
+Generated output
+
+Workflow panel
+
+Input area
+
+API/model controls
+
+---
+
+# 19. API KEY / MODEL UI
+
+The user must be able to configure their model.
+
+Create a settings drawer/panel.
+
+Fields:
+
+Provider
+API Key
+Model
+Base URL
+
+Example:
+
+Provider
+[ Auto Detect ]
+
+API Key
+[ ••••••••••••••• ]
+
+Model
+[ auto / selected model ]
+
+Base URL
+[ optional ]
+
+Buttons:
+
+Test Connection
+Save For Session
+
+"Save For Session" MUST mean local browser session/local storage only if the user explicitly chooses it.
+
+Never send saved credentials unnecessarily.
+
+Do not permanently store API keys on the backend.
+
+---
+
+# 20. CHAT INPUT
+
+Large Claude-style input box.
+
+Placeholder:
+
+"Describe what you want me to build..."
+
+Button:
+
+Run Agent
+
+Optional keyboard shortcut:
+
+Ctrl + Enter
+
+or
+
+Cmd + Enter
+
+---
+
+# 21. LIVE WORKFLOW UI
+
+This is a major feature.
+
+While the agent is running, show a live workflow timeline.
+
+Example:
+
+● Workflow started
+✓ Task created
+✓ Task ready
+● Task started
+✓ LLM called
+✓ Code generated
+● Tests generated
+● Static analysis running
+✓ Container started
+● Tests running
+✗ Test failed
+↻ Retry started
+● Repairing code
+✓ Code regenerated
+● Tests running
+✓ Tests passed
+✓ Task completed
+
+The UI should update live without page refresh.
+
+Use:
+
+Server-Sent Events (SSE)
+
+or WebSocket.
+
+Prefer SSE if bidirectional communication is not required.
+
+---
+
+# 22. WORKFLOW NODE VISUALIZATION
+
+Also create a compact DAG visualization in the frontend.
+
+Example:
+
+```
+     Generate Code
+          |
+   ----------------
+   |              |
+```
+
+Generate Tests   Static Analysis
+|              |
+---------+------
+|
+Execute
+|
+Result
+
+Each node should have a state:
+
+gray = pending
+blue = running
+green = success
+red = failed
+yellow = retrying
+
+Do not use hard-coded fake states.
+
+These states must come from backend events.
+
+---
+
+# 23. RESULT VIEW
+
+After success show:
+
+"Task Completed"
+
+Then tabs:
+
+Code
+
+Tests
+
+Static Analysis
+
+Execution
+
+Workflow
+
+Files
+
+For generated files provide:
+
+filename
+language
+code viewer
+copy button
+download option
+
+Also show:
+
+execution time
+number of retries
+test result
+static analysis result
+
+---
+
+# 24. FAILURE VIEW
+
+If maximum retries are exhausted:
+
+Show:
+
+"Task could not be fully validated."
+
+Then show:
+
+Final generated code
+
+Failed tests
+
+Static analysis
+
+Execution logs
+
+Retry history
+
+Reason for failure
+
+Do NOT hide failures.
+
+The user should clearly understand what happened.
+
+---
+
+# 25. CONVERSATION MEMORY
+
+Implement a memory layer without login.
+
+Entities:
+
+User
+Conversation
+Message
+Task
+WorkflowRun
+Artifact
+RetryAttempt
+
+Suggested SQLite schema:
+
+users
+
+id
+created_at
+
+conversations
+
+id
+user_id
+title
+created_at
+updated_at
+
+messages
+
+id
+conversation_id
+role
+content
+created_at
+
+tasks
+
+id
+conversation_id
+prompt
+status
+created_at
+completed_at
+
+workflow_runs
+
+id
+task_id
+dag_json
+status
+started_at
+completed_at
+
+artifacts
+
+id
+task_id
+path
+content_hash
+created_at
+
+retry_attempts
+
+id
+task_id
+attempt_number
+code_snapshot
+test_output
+static_analysis_output
+execution_output
+created_at
+
+---
+
+# 26. MEMORY RETRIEVAL
+
+Before planner execution:
+
+retrieve recent conversation history.
+
+Pass relevant history to planner.
+
+Do not dump unlimited history into the LLM.
+
+Create:
+
+MemoryManager
+
+with:
+
+get_recent_messages()
+get_conversation_summary()
+get_previous_failures()
+get_relevant_artifacts()
+
+Keep token usage controlled.
+
+Create a compact conversation summary when history becomes large.
+
+---
+
+# 27. CONVERSATION SIDEBAR
+
+Frontend should call:
+
+GET /api/conversations?user_id=...
+
+Create:
+
+POST /api/conversations
+
+Load:
+
+GET /api/conversations/:id
+
+Messages:
+
+GET /api/conversations/:id/messages
+
+New chat should create a new conversation.
+
+---
+
+# 28. API DESIGN
+
+Create REST APIs similar to:
+
+POST /api/chat
+
+POST /api/tasks
+
+GET /api/tasks/:id
+
+GET /api/tasks/:id/events
+
+GET /api/conversations
+
+POST /api/conversations
+
+GET /api/conversations/:id
+
+GET /api/conversations/:id/messages
+
+POST /api/provider/test
+
+GET /api/health
+
+SSE:
+
+GET /api/tasks/:id/stream
+
+---
+
+# 29. POST /api/tasks
+
+Request:
+
+{
+"user_id": "...",
+"conversation_id": "...",
+"prompt": "...",
+"provider": "auto",
+"model": "...",
+"base_url": "...",
+"api_key": "..."
+}
+
+Response:
+
+{
+"task_id": "...",
+"status": "CREATED"
+}
+
+The API key should be kept only in the in-memory execution context for that task.
+
+Do not store it in the task database.
+
+---
+
+# 30. WORKFLOW EVENT CONTRACT
+
+Create a shared event schema.
+
+Event types:
+
+WORKFLOW_STARTED
+TASK_CREATED
+TASK_READY
+TASK_STARTED
+LLM_CALLED
+LLM_COMPLETED
+CODE_GENERATED
+TESTS_GENERATED
+STATIC_ANALYSIS_STARTED
+STATIC_ANALYSIS_COMPLETED
+CONTAINER_STARTED
+CONTAINER_COMPLETED
+TEST_STARTED
+TEST_PASSED
+TEST_FAILED
+RETRY_STARTED
+REPAIR_STARTED
+REPAIR_COMPLETED
+TASK_COMPLETED
+TASK_FAILED
+
+Each event should contain:
+
+event_id
+task_id
+timestamp
+type
+message
+node_id
+attempt
+metadata
+
+---
+
+# 31. ERROR HANDLING
+
+Never crash the full server because one workflow failed.
+
+Every workflow should have structured error handling.
+
+Categories:
+
+LLM_ERROR
+INVALID_PLAN
+DAG_ERROR
+PROVIDER_ERROR
+TIMEOUT
+CONTAINER_ERROR
+TEST_ERROR
+STATIC_ANALYSIS_ERROR
+MEMORY_ERROR
+VALIDATION_ERROR
+
+Return useful error information to frontend.
+
+---
+
+# 32. LLM RESPONSE VALIDATION
+
+Do not blindly trust LLM JSON.
+
+Implement:
+
+JSON parsing
+schema validation
+required-field checks
+file path validation
+duplicate file checks
+path traversal protection
+
+Reject paths such as:
+
+../../secret
+/etc/passwd
+C:\Windows...
+
+Only allow files inside task workspace.
+
+---
+
+# 33. FILE SYSTEM SANDBOX
+
+Every task should have:
+
+runtime/tasks/<task_id>/
+
+For example:
+
+runtime/tasks/task_123/
+generated/
+tests/
+logs/
+metadata/
+output/
+
+Never mix files from two tasks.
+
+Clean up temporary Docker workspaces after completion according to retention policy.
+
+---
+
+# 34. OBSERVABILITY
+
+Create structured logs.
+
+Every log entry should contain:
+
+timestamp
+task_id
+conversation_id
+component
+event
+duration
+status
+
+Never log secrets.
+
+Provide useful developer logs for debugging.
+
+---
+
+# 35. HEALTH CHECK
+
+Implement:
+
+GET /api/health
+
+Response:
+
+{
+"status": "ok",
+"dag_engine": "ok",
+"database": "ok",
+"docker": "ok"
+}
+
+If Docker is unavailable:
+
+docker: unavailable
+
+but server should still start.
+
+---
+
+# 36. TESTING
+
+Write real automated tests.
+
+Test at minimum:
+
+DAG node creation
+dependency resolution
+cycle detection
+parallel execution
+retry logic
+event ordering
+SQLite conversation storage
+provider selection
+JSON validation
+path traversal protection
+Docker executor command creation
+failure handling
+
+Also create an integration test for:
+
+Prompt
+
+↓
+
+Planner
+
+↓
+
+Code
+
+↓
+
+Tests
+
+↓
+
+Static Analysis
+
+↓
+
+Docker
+
+↓
+
+Success/Retry
+
+Use mocked LLM providers in unit/integration tests so tests do not require real API keys.
+
+---
+
+# 37. MOCK PROVIDER
+
+Create:
+
+MockLLMProvider
+
+It should return deterministic outputs for tests.
+
+Use it to test:
+
+successful workflow
+
+failed test -> retry -> success
+
+four failed retries
+
+invalid planner output
+
+provider failure
+
+---
+
+# 38. DAG PARALLEL EXECUTION TEST
+
+Explicitly test this case:
+
+A -> B
+A -> C
+B -> D
+C -> D
+
+Verify:
+
+A runs first.
+
+B and C become READY after A.
+
+B and C can execute concurrently.
+
+D cannot start until both complete.
+
+The scheduler must not execute D early.
+
+---
+
+# 39. C++ DESIGN QUALITY
+
+Use:
+
+RAII
+smart pointers
+const correctness
+thread safety
+mutex/condition_variable where needed
+future/promise where useful
+clear ownership
+exception safety
+structured error handling
+
+Avoid:
+
+global mutable state
+raw owning pointers
+sleep-based synchronization
+busy waiting
+one-thread-per-task design
+
+Keep components loosely coupled.
+
+---
+
+# 40. BUILD SYSTEM
+
+Use CMake.
+
+Target:
+
+C++20
+
+The project must build with:
+
+cmake
+make
+
+or:
+
+cmake --build
+
+Provide:
+
+Debug
+Release
+
+build instructions in README.
+
+---
+
+# 41. DEPENDENCIES
+
+Choose mature C++ libraries.
+
+Reasonable examples:
+
+HTTP server:
+Crow / Drogon / another lightweight C++ HTTP framework
+
+JSON:
+nlohmann/json
+
+SQLite:
+SQLite3
+
+HTTP client:
+libcurl
+
+Testing:
+GoogleTest or Catch2
+
+Do not overcomplicate the dependency graph.
+
+Document every dependency.
+
+---
+
+# 42. FRONTEND IMPLEMENTATION
+
+Use:
+
+index.html
+style.css
+app.js
+
+No build step should be required for frontend.
+
+Frontend should work as static assets served by backend.
+
+Use fetch()
+
+Use EventSource for SSE.
+
+Implement:
+
+startTask()
+connectTaskStream()
+renderEvent()
+renderDAG()
+loadConversations()
+loadConversation()
+sendMessage()
+saveSettings()
+testProviderConnection()
+
+---
+
+# 43. CLAUDE-LIKE USER EXPERIENCE
+
+The interface should feel like an AI coding workspace.
+
+When user submits:
+
+User message appears immediately.
+
+Then an assistant workflow message appears.
+
+Example:
+
+"Working on your task..."
+
+Below that:
+
+Workflow
+
+Generate Code
+Generate Tests
+Static Analysis
+Execute
+
+As events arrive, update each item.
+
+Do not simply display raw JSON.
+
+Raw execution details can be placed under expandable sections.
+
+---
+
+# 44. RESPONSIVE DESIGN
+
+Support:
+
+desktop
+tablet
+mobile
+
+Sidebar should collapse on mobile.
+
+Chat input should remain usable.
+
+Workflow panel should become responsive.
+
+---
+
+# 45. ACCESSIBILITY
+
+Use:
+
+semantic HTML
+keyboard navigation
+proper labels
+aria attributes where appropriate
+visible focus states
+
+Do not depend only on color to communicate success/failure.
+
+---
+
+# 46. API KEY PRIVACY IN FRONTEND
+
+Never print API key in DOM after setting it.
+
+Mask it.
+
+Do not include it in browser console logs.
+
+When sending requests:
+
+Authorization information should only be included when required.
+
+Use HTTPS in production.
+
+---
+
+# 47. SECURITY FOR GENERATED CODE
+
+This is critical.
+
+Generated code is untrusted.
+
+Docker execution must:
+
+* disable privileged mode
+* disable host networking
+* limit CPU
+* limit memory
+* limit processes
+* enforce timeout
+* use temporary workspace
+* avoid sensitive mounts
+* avoid Docker socket exposure
+
+Implement defense-in-depth.
+
+Clearly document that Docker isolation is a security boundary that must be hardened before exposing the service publicly.
+
+---
+
+# 48. TASK STATE MACHINE
+
+Implement an explicit task state machine.
+
+States:
+
+CREATED
+PLANNING
+PLANNED
+RUNNING
+VALIDATING
+FAILED_TEST
+RETRYING
+COMPLETED
+FAILED
+
+Do not manage task status using random strings scattered throughout the code.
+
+Use enums.
+
+---
+
+# 49. WORKFLOW EXECUTION EXAMPLE
+
+User prompt:
+
+"Build a C++ program that calculates the shortest path between two nodes."
+
+Planner creates:
+
+A Generate Code
+B Generate Tests depends_on A
+C Static Analysis depends_on A
+D Execute depends_on B,C
+
+A executes.
+
+After A finishes:
+
+B and C run concurrently.
+
+When B and C finish:
+
+D executes Docker container.
+
+If tests pass:
+
+SUCCESS
+
+Otherwise:
+
+RETRY_STARTED
+
+Repair agent receives:
+
+failed test
+stdout
+stderr
+code
+tests
+static analysis
+
+Then:
+
+new code
+new tests
+static analysis
+Docker
+tests
+
+Repeat max 4 repair attempts.
+
+---
+
+# 50. IMPORTANT: DO NOT FAKE THE AGENT
+
+Do NOT create fake workflow animations.
+
+The frontend must receive real backend events.
+
+Do not hard-code:
+
+"LLM called"
+
+"Container started"
+
+"Test passed"
+
+unless those operations actually happened.
+
+Every displayed workflow state must come from the real workflow engine.
+
+---
+
+# 51. IMPORTANT: DO NOT FAKE THE DAG
+
+The DAG displayed in frontend must be created from the actual planner result.
+
+If planner returns:
+
+A -> B
+A -> C
+B,C -> D
+
+the UI must visualize that actual DAG.
+
+---
+
+# 52. PLANNER PROMPT
+
+Create a robust system prompt for the Planner.
+
+Planner responsibilities:
+
+* understand user requirement
+* decompose task
+* identify dependencies
+* maximize safe parallelism
+* return valid DAG
+* avoid unnecessary nodes
+* identify language/tooling
+* identify execution requirements
+
+Planner output must be machine-readable JSON.
+
+---
+
+# 53. CODE GENERATION PROMPT
+
+Coder must:
+
+* follow planner
+* generate production-quality code
+* output complete files
+* avoid placeholders
+* preserve previous working code during repairs
+* fix actual failures
+* not invent successful test results
+
+---
+
+# 54. TEST GENERATION PROMPT
+
+Test agent must:
+
+* inspect generated code
+* create meaningful tests
+* cover edge cases
+* produce runnable tests
+* avoid tests that merely reproduce implementation assumptions
+* revise tests when the previous test was invalid
+
+---
+
+# 55. REPAIR PROMPT
+
+Repair agent receives complete debugging context.
+
+Prompt it to:
+
+1. identify root cause
+2. inspect failing test
+3. inspect stderr/stdout
+4. inspect static analysis
+5. modify only required files
+6. regenerate necessary tests
+7. return complete updated files
+
+Do not tell the LLM that a run succeeded unless the actual execution succeeded.
+
+---
+
+# 56. FINAL RESPONSE
+
+After successful execution return:
+
+Summary
+
+Files
+
+Tests
+
+Static Analysis
+
+Execution
+
+Retries
+
+Then show the generated code/files.
+
+Example:
+
+Task Completed
+
+Status: SUCCESS
+
+Retries: 1
+
+Tests: 12 passed
+
+Static Analysis: Passed
+
+Execution: 0.84s
+
+Files:
+
+* main.cpp
+* tests/test_main.cpp
+
+---
+
+# 57. PROJECT CONFIGURATION
+
+Create configuration:
+
+config/
+
+or environment variables for:
+
+SERVER_PORT
+DATABASE_PATH
+MAX_RETRIES
+DOCKER_TIMEOUT
+DOCKER_MEMORY_LIMIT
+DOCKER_CPU_LIMIT
+WORKSPACE_PATH
+
+Do not require global provider API keys because the user supplies their own.
+
+---
+
+# 58. DOCKERFILE
+
+Create a production Dockerfile for the server.
+
+Also create a separate runtime Docker strategy for untrusted generated code.
+
+Do not combine application container privileges with generated-code privileges.
+
+The server container should orchestrate execution of isolated task containers.
+
+---
+
+# 59. HUGGING FACE SPACE SUPPORT
+
+The final project should be deployable to a Hugging Face Space.
+
+Prepare:
+
+README.md
+
+Dockerfile
+
+configuration instructions
+
+port configuration
+
+persistent storage considerations
+
+startup command
+
+environment variable documentation
+
+The app should expose its HTTP service on the expected environment port.
+
+Do not hard-code localhost-only behavior.
+
+Bind the server to:
+
+0.0.0.0
+
+---
+
+# 60. LOCAL DEVELOPMENT
+
+README must contain exact commands:
+
+clone
+
+install dependencies
+
+build
+
+run
+
+open browser
+
+test
+
+docker verification
+
+Example structure:
+
+mkdir build
+cd build
+cmake ..
+cmake --build . -j
+
+Then:
+
+./agentos
+
+or the correct generated executable.
+
+Document required packages.
+
+---
+
+# 61. DEVELOPMENT MODES
+
+Provide:
+
+Development mode
+
+Production mode
+
+Development mode:
+
+verbose logs
+mock provider option
+faster iteration
+
+Production mode:
+
+structured logs
+secret redaction
+resource limits
+proper error handling
+
+---
+
+# 62. MOCK / DEMO MODE
+
+Create a demo mode that works without real API keys.
+
+Example:
+
+DEMO_MODE=true
+
+In demo mode:
+
+Mock planner
+
+Mock coder
+
+Mock test agent
+
+Mock static analysis
+
+Mock executor result
+
+But make it obvious in UI:
+
+DEMO MODE
+
+This is only for testing the UI and DAG engine.
+
+---
+
+# 63. CODE QUALITY
+
+Before considering the implementation complete:
+
+* remove TODO placeholders
+* remove fake implementations
+* remove dead code
+* remove debugging prints
+* add comments for non-obvious logic
+* ensure compilation
+* ensure unit tests pass
+* ensure frontend loads
+* ensure backend starts
+* ensure mock workflow executes end-to-end
+
+---
+
+# 64. ACCEPTANCE TEST
+
+The project is only considered complete when this scenario works:
+
+1. Start server.
+2. Open browser.
+3. Anonymous user_id is created.
+4. Create new conversation.
+5. Enter API provider configuration.
+6. Enter prompt.
+7. Click Run Agent.
+8. Backend creates task.
+9. Planner generates DAG.
+10. Frontend displays the real DAG.
+11. Generate Code node executes.
+12. Generate Tests and Static Analysis become runnable.
+13. They execute in parallel where dependencies permit.
+14. Docker container starts.
+15. Tests execute.
+16. If tests pass:
+    Task Completed appears.
+17. If tests fail:
+    Test Failed appears.
+18. Retry Started appears.
+19. Repair agent runs.
+20. New code/tests are produced.
+21. Docker runs again.
+22. Process repeats.
+23. Maximum four repair attempts are enforced.
+24. Final success/failure is shown.
+25. Conversation is saved to SQLite.
+26. Refreshing the page preserves conversation history for the same anonymous user_id.
+27. API key is not stored in SQLite or logs.
+
+---
+
+# 65. IMPLEMENTATION ORDER
+
+Implement in this order:
+
+PHASE 1
+Project skeleton
+CMake
+basic C++ server
+frontend shell
+
+PHASE 2
+DAG data structures
+dependency resolver
+scheduler
+thread pool
+DAG tests
+
+PHASE 3
+LLM provider abstraction
+mock provider
+planner
+
+PHASE 4
+coder agent
+test agent
+static-analysis agent
+
+PHASE 5
+Docker executor
+resource limits
+execution result parsing
+
+PHASE 6
+workflow engine
+retry manager
+event streaming
+
+PHASE 7
+SQLite memory
+anonymous user ID
+conversation history
+
+PHASE 8
+frontend workflow UI
+DAG visualization
+conversation sidebar
+settings panel
+
+PHASE 9
+security hardening
+secret redaction
+path validation
+sandboxing
+
+PHASE 10
+integration tests
+README
+Docker deployment
+Hugging Face deployment
+
+---
+
+# 66. IMPORTANT CODEX BEHAVIOR
+
+Do not stop after creating the architecture.
+
+Actually implement the files.
+
+Do not leave major functions as placeholders.
+
+Do not return only a plan.
+
+Create all necessary source files.
+
+Compile the project.
+
+Run the tests.
+
+Fix compilation errors.
+
+Fix test failures.
+
+Verify the frontend loads.
+
+Verify the mock end-to-end workflow.
+
+Then provide a final summary containing:
+
+1. files created
+2. architecture
+3. how to run locally
+4. how to test
+5. how to configure an LLM provider
+6. how the DAG engine works
+7. how retry works
+8. how memory works
+9. security limitations
+10. Hugging Face deployment instructions
+
+When making implementation decisions, prefer simple, maintainable, modular designs over unnecessary complexity.
+
+The final result must be a real working application, not a visual mockup.
